@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Live THD Dashboard</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding: 18px; }
+    .metrics { display:flex; gap:20px; margin-bottom:12px; }
+    .metric { padding:12px; border-radius:8px; background:#f3f4f6; min-width:140px; text-align:center; }
+    canvas { max-width:100%; height:300px; }
+  </style>
+</head>
+<body>
+  <h2>Live THD Dashboard</h2>
+  <div class="metrics">
+    <div class="metric"><strong>Vf RMS</strong><div id="vf_rms">--</div></div>
+    <div class="metric"><strong>Vd RMS</strong><div id="vd_rms">--</div></div>
+    <div class="metric"><strong>THD</strong><div id="thd">--</div></div>
+    <div class="metric"><strong>THD %</strong><div id="thd_pr">--</div></div>
+  </div>
+
+  <h3>Time-domain (0 - 0.06s)</h3>
+  <canvas id="timeChart"></canvas>
+
+  <h3>Frequency Domain (0 - 250 Hz)</h3>
+  <canvas id="freqChart"></canvas>
+
+  <script>
+    // connect to server (adjust host:port if needed)
+    const socket = io("http://localhost:5000");
+
+    // DOM elements
+    const vfRmsEl = document.getElementById("vf_rms");
+    const vdRmsEl = document.getElementById("vd_rms");
+    const thdEl   = document.getElementById("thd");
+    const thdPrEl = document.getElementById("thd_pr");
+
+    // Chart.js time-domain
+    const timeCtx = document.getElementById("timeChart").getContext("2d");
+    const timeChart = new Chart(timeCtx, {
+      type: 'line',
+      data: {
+        labels: [], // time
+        datasets: [
+          { label: 'Vf (fundamental)', data: [], tension: 0.2, borderWidth: 1, pointRadius: 0 },
+          { label: 'Vd (distorted)', data: [], tension: 0.2, borderWidth: 1, pointRadius: 0 }
+        ]
+      },
+      options: {
+        animation: false,
+        responsive: true,
+        scales: { x: { display: true, title: { display: true, text: 'Time (s)' } }, y: { display: true, title: { display: true, text: 'Amplitude (V)' } } }
+      }
+    });
+
+    // Chart.js frequency-domain
+    const freqCtx = document.getElementById("freqChart").getContext("2d");
+    const freqChart = new Chart(freqCtx, {
+      type: 'line',
+      data: {
+        labels: [], // freqs
+        datasets: [
+          { label: 'Vf FFT mag', data: [], tension: 0.2, borderWidth: 1, pointRadius: 0 },
+          { label: 'Vd FFT mag', data: [], tension: 0.2, borderWidth: 1, pointRadius: 0 }
+        ]
+      },
+      options: {
+        animation: false,
+        responsive: true,
+        scales: { x: { display: true, title: { display: true, text: 'Frequency (Hz)' } }, y: { display: true, title: { display: true, text: 'Magnitude' } } }
+      }
+    });
+
+    socket.on("connect", () => {
+      console.log("connected to server");
+    });
+
+    socket.on("thd_update", (payload) => {
+      // update numbers
+      vfRmsEl.innerText = payload.Vf_RMS;
+      vdRmsEl.innerText = payload.Vd_RMS;
+      thdEl.innerText = payload.THD;
+      thdPrEl.innerText = payload.THD_pr + " %";
+
+      // update time chart
+      timeChart.data.labels = payload.time;
+      timeChart.data.datasets[0].data = payload.Vf;
+      timeChart.data.datasets[1].data = payload.Vd;
+      timeChart.update('none');
+
+      // update freq chart
+      freqChart.data.labels = payload.freqs;
+      freqChart.data.datasets[0].data = payload.Vf_fd;
+      freqChart.data.datasets[1].data = payload.Vd_fd;
+      freqChart.update('none');
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Live THD Data</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<h2>Live Data</h2>
+
+<p>Vf RMS: <span id="vf">--</span></p>
+<p>Vd RMS: <span id="vd">--</span></p>
+<p>THD: <span id="thd">--</span></p>
+<p>THD %: <span id="thdpr">--</span></p>
+
+<h3>Live THD% Graph</h3>
+<canvas id="thdChart" width="400" height="200"></canvas>
+
+<script>
+    // 👇 CHANGE THIS TO YOUR LAPTOP IP
+    const socket = io("http://YOUR-IP-HERE:5000");
+
+    // Setup empty chart
+    const ctx = document.getElementById('thdChart').getContext('2d');
+    const thdChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],       // time points
+            datasets: [{
+                label: 'THD %',
+                data: [],
+                borderWidth: 2,
+                tension: 0.2,
+                pointRadius: 0
+            }]
+        },
+        options: {
+            animation: false,
+            scales: {
+                x: {
+                    title: { display: true, text: "Time (updates)" }
+                },
+                y: {
+                    title: { display: true, text: "THD %" },
+                    suggestedMin: 0
+                }
+            }
+        }
+    });
+
+    socket.on("data_update", (data) => {
+        // Update text
+        document.getElementById("vf").innerText = data.Vf_RMS;
+        document.getElementById("vd").innerText = data.Vd_RMS;
+        document.getElementById("thd").innerText = data.THD;
+        document.getElementById("thdpr").innerText = data.THD_pr + "%";
+
+        // Update graph
+        thdChart.data.labels.push("");   // simple x-axis point
+        thdChart.data.datasets[0].data.push(data.THD_pr);
+
+        // keep graph to last 30 points
+        if (thdChart.data.labels.length > 30) {
+            thdChart.data.labels.shift();
+            thdChart.data.datasets[0].data.shift();
+        }
+
+        thdChart.update();
+    });
+</script>
+
+</body>
+</html>
